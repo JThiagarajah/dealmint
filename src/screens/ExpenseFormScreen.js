@@ -8,7 +8,7 @@ import { smoothLayout } from '../components/AssetCard';
 import { getExpense, saveExpense, deleteExpense, listAssets } from '../db/repo';
 import { confirm } from '../utils/confirm';
 import { ASSET_TYPES, DIRECT_CATEGORIES, INDIRECT_CATEGORIES, PHASES, PHASE_LIST } from '../constants';
-import { today, cleanNumber, moneyShort } from '../utils/format';
+import { today, cleanNumber, moneyShort, prettyDate } from '../utils/format';
 
 export default function ExpenseFormScreen({ route, navigation }) {
   const { c, type } = useTheme();
@@ -51,6 +51,10 @@ export default function ExpenseFormScreen({ route, navigation }) {
     if (isDirect && !f.asset_id) e.asset = 'Choose which asset this expense belongs to';
     if (!f.category) e.category = 'Choose a category';
     if (cleanNumber(f.amount) <= 0) e.amount = 'Enter an amount';
+    // A direct expense can't be dated before the asset was bought
+    if (isDirect && selected && f.date < selected.purchase_date) {
+      e.date = `This date is before the asset was bought (${prettyDate(selected.purchase_date)}).`;
+    }
     setErrors(e);
     if (Object.keys(e).length) { haptic.warn(); return; }
     await saveExpense({ ...f, amount: cleanNumber(f.amount), note: f.note.trim() });
@@ -92,9 +96,9 @@ export default function ExpenseFormScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <Group>
+        <Group footer={errors.date ? <Text style={{ color: c.red }}>{errors.date}</Text> : null}>
           <MoneyField label="Amount" value={f.amount} onChange={set('amount')} error={errors.amount} autoFocus={!p.id} />
-          <DateField label="Date" value={f.date} onChange={set('date')} maximumDate={new Date()} />
+          <DateField label="Date" value={f.date} onChange={(d) => { set('date')(d); setErrors((x) => ({ ...x, date: null })); }} maximumDate={new Date()} />
         </Group>
 
         {isDirect ? (
