@@ -5,7 +5,7 @@ import { Screen, Group, Input, Card, Button, IconTile, haptic } from '../compone
 import { DateField, MoneyField } from '../components/fields';
 import { getAsset, sellAsset, saveExpense } from '../db/repo';
 import { ASSET_TYPES } from '../constants';
-import { today, cleanNumber, money, percent, daysBetween } from '../utils/format';
+import { today, cleanNumber, money, percent, daysBetween, prettyDate } from '../utils/format';
 
 export default function SellAssetScreen({ route, navigation }) {
   const { c, type } = useTheme();
@@ -17,6 +17,7 @@ export default function SellAssetScreen({ route, navigation }) {
   const [buyer, setBuyer] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const [dateError, setDateError] = useState('');
 
   useEffect(() => {
     getAsset(id).then((x) => { setA(x); if (x?.asking_price) setPrice(String(x.asking_price)); });
@@ -32,6 +33,12 @@ export default function SellAssetScreen({ route, navigation }) {
 
   const confirmSale = async () => {
     if (sale <= 0) { setError('Enter the sale price'); haptic.warn(); return; }
+    // A sale can't happen before the asset was bought
+    if (date < a.purchase_date) {
+      setDateError(`The sale date can't be before the purchase date (${prettyDate(a.purchase_date)}).`);
+      haptic.warn();
+      return;
+    }
     if (comm > 0) {
       await saveExpense({ expense_type: 'Direct', asset_id: id, phase: 'Sale', category: 'Sales Commission', amount: comm, date, note: 'Added when selling' });
     }
@@ -60,9 +67,9 @@ export default function SellAssetScreen({ route, navigation }) {
           </View>
         </View>
 
-        <Group header="Sale">
+        <Group header="Sale" footer={dateError ? <Text style={{ color: c.red }}>{dateError}</Text> : null}>
           <MoneyField label="Sale price" value={price} onChange={(v) => { setPrice(v); setError(''); }} error={error} />
-          <DateField label="Sale date" value={date} onChange={setDate} maximumDate={new Date()} />
+          <DateField label="Sale date" value={date} onChange={(d) => { setDate(d); setDateError(''); }} maximumDate={new Date()} />
           <MoneyField label="Sales commission (optional)" value={commission} onChange={setCommission} />
         </Group>
 
